@@ -1,0 +1,229 @@
+﻿@model DigitalDetoxSystem.Models.UsageLogStatisticsViewModel
+
+<style>
+    #chartWarning {
+        font-size: 14px;
+        font-weight: bold;
+        padding: 10px;
+        text-align: center;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center">
+    <h2>歷史紀錄</h2>
+    <button id="toggleChartBtn" class="btn btn-primary">顯示統計圖表</button>
+</div>
+<a asp-action="Create" class="btn btn-success mb-3">新增記錄</a>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h4>📊 今日統計</h4>
+        <p><strong>認真：</strong> @Model.SeriousCount 次，共 @Model.SeriousTotalTime 分鐘 (平均 @Model.SeriousAvgTime 分鐘/次)</p>
+        <p><strong>放鬆：</strong> @Model.RelaxCount 次，共 @Model.RelaxTotalTime 分鐘 (平均 @Model.RelaxAvgTime 分鐘/次)</p>
+    </div>
+</div>
+
+<div id="chartContainer" style="display: none;">
+    <div id="chartWarning" class="alert alert-warning mt-2" style="display: none;"></div>
+    <div id="usageChart" style="width: 100%; height: 500px;"></div>
+</div>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>類型</th>
+            <th>理由</th>
+            <th>時間</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var log in Model.Logs)
+        {
+            <tr>
+                <td>@log.Type</td>
+                <td>@log.Reason</td>
+                <td>@log.Timestamp</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        let chartVisible = false;
+        const toggleChartBtn = document.getElementById("toggleChartBtn");
+        const chartContainer = document.getElementById("chartContainer");
+        const chartWarning = document.getElementById("chartWarning");
+
+        //  確保按鈕存在
+        if (!toggleChartBtn || !chartContainer || !chartWarning) {
+            console.error("錯誤：找不到必要的 HTML 元素！");
+            return;
+        }
+
+        toggleChartBtn.addEventListener("click", function () {
+            chartVisible = !chartVisible;
+            chartContainer.style.display = chartVisible ? "block" : "none";
+            toggleChartBtn.textContent = chartVisible ? "隱藏統計圖表" : "顯示統計圖表";
+
+            if (chartVisible) {
+                drawChart();
+            }
+        });
+
+        function drawChart() {
+            console.log("繪製 7 天圖表...");
+
+            let usageData;
+            try {
+                usageData = JSON.parse('@Html.Raw(Model.Last7DaysUsageJson)');
+            } catch (error) {
+                console.error("錯誤：無法解析 JSON 資料！", error);
+                showWarning("⚠ 數據格式錯誤，無法顯示圖表！");
+                return;
+            }
+
+            console.log("JSON 資料:", usageData);
+
+            //  檢查數據完整性
+            if (!usageData || !Array.isArray(usageData) || usageData.length === 0) {
+                console.error("錯誤：JSON 資料無效，無法繪製圖表！");
+                showWarning("⚠️ 目前沒有足夠的數據來繪製圖表。請稍後再試。");
+                return;
+            }
+
+            const labels = usageData.map(d => d.Date);
+            const seriousCounts = usageData.map(d => d.SeriousCount ?? 0);
+            const relaxCounts = usageData.map(d => d.RelaxCount ?? 0);
+
+            //  確保數據完整，不要傳遞 `undefined`
+            if (labels.length === 0 || seriousCounts.every(v => v === 0) && relaxCounts.every(v => v === 0)) {
+                console.error("錯誤：數據不完整，無法顯示圖表！");
+                showWarning("⚠️ 沒有可用的數據來繪製圖表，請稍後再試。");
+                return;
+            }
+
+            chartWarning.style.display = "none";
+
+            const options = {
+                chart: {
+                    type: 'line',
+                    height: 500,
+                    animations: { enabled: true }
+                },
+                series: [
+                    { name: "認真", data: seriousCounts },
+                    { name: "放鬆", data: relaxCounts }
+                ],
+                xaxis: {
+                    categories: labels,
+                    title: { text: "日期" }
+                },
+                yaxis: {
+                    title: { text: "次數" },
+                    min: 0
+                },
+                colors: ['#1E90FF', '#32CD32'],
+                stroke: {
+                    curve: 'smooth',
+                    width: 2
+                }
+            };
+
+            if (window.usageChart instanceof ApexCharts) {
+                window.usageChart.updateOptions({
+                    series: options.series,
+                    xaxis: options.xaxis
+                });
+            } else {
+                window.usageChart = new ApexCharts(document.querySelector("#usageChart"), options);
+                window.usageChart.render();
+            }
+
+            console.log("ApexCharts 圖表繪製完成！");
+        }
+
+        function showWarning(message) {
+            chartWarning.textContent = message;
+            chartWarning.style.display = "block";
+        }
+
+    });
+</script>
+
+
+
+
+
+
+@* <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        let chartVisible = false;
+        const toggleChartBtn = document.getElementById("toggleChartBtn");
+        const chartContainer = document.getElementById("chartContainer");
+
+        toggleChartBtn.addEventListener("click", function () {
+            chartVisible = !chartVisible;
+            chartContainer.style.display = chartVisible ? "block" : "none";
+            toggleChartBtn.textContent = chartVisible ? "隱藏統計圖表" : "顯示統計圖表";
+
+            if (chartVisible) {
+                console.log("重新繪製圖表...");
+
+                // ✅ 確保 `window.usageChart` 是 `Chart` 類型
+                if (window.usageChart instanceof Chart) {
+                    window.usageChart.destroy();
+                }
+
+                const ctx = document.getElementById("usageChart").getContext("2d");
+                const usageData = JSON.parse('@Html.Raw(Model.Last7DaysUsageJson)');
+
+                console.log("JSON 資料:", usageData);
+
+                const labels = usageData.map(d => d.Date);
+                const seriousCounts = usageData.map(d => d.SeriousCount);
+                const relaxCounts = usageData.map(d => d.RelaxCount);
+
+                // ✅ 重新建立 `Chart` 物件
+                window.usageChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: "認真",
+                                data: seriousCounts,
+                                borderColor: "blue",
+                                backgroundColor: "rgba(0, 0, 255, 0.1)",
+                                fill: true
+                            },
+                            {
+                                label: "放鬆",
+                                data: relaxCounts,
+                                borderColor: "green",
+                                backgroundColor: "rgba(0, 255, 0, 0.1)",
+                                fill: true
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { title: { display: true, text: "日期" } },
+                            y: { title: { display: true, text: "次數" }, beginAtZero: true }
+                        }
+                    }
+                });
+
+                console.log("圖表繪製完成");
+            }
+        });
+    });
+</script> *@
+
+
+

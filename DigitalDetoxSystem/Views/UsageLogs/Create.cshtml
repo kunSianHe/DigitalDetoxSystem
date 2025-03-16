@@ -1,0 +1,21 @@
+﻿@model DigitalDetoxSystem.Models.UsageLog
+
+<h2>記錄開啟瀏覽器的理由</h2>
+
+<form asp-action="Create" method="post">
+    <div class="form-group">
+        <label>請輸入你開啟瀏覽器的理由：</label>
+        <input asp-for="Reason" class="form-control" required />
+    </div>
+    <br />
+    <div class="form-group">
+        <label>選擇類型：</label>
+        <select asp-for="Type" class="form-control" required>
+            <option value="">請選擇</option>
+            <option value="認真">認真</option>
+            <option value="放鬆">放鬆</option>
+        </select>
+    </div>
+    <br />
+    <button type="submit" class="btn btn-primary">提交</button>
+</form>
